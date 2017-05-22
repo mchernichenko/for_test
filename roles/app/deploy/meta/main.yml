@@ -1,9 +1,0 @@
-galaxy_info:
-  author: Evgeny Luvsandugar
-  description: Role for deploy application
-  company: Peter-Service
-
-  min_ansible_version: 2.2
-
-dependencies:
-  - src: "common-libs"

@@ -1,9 +1,0 @@
-galaxy_info:
-  author: Konstantin Shuleshov
-  description: Role for deploy configuration to Oracle DB
-  company: Peter-Service
-
-  min_ansible_version: 2.2
-
-dependencies:
-  - src: "common-libs"
