@@ -1,0 +1,3 @@
+{% for bundle in bundles_to_wait %}
+echo {{ bundle.symbolic_name }} "|" (bundle:status {{ bundle.symbolic_name }})
+{% endfor %}

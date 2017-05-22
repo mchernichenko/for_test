@@ -1,0 +1,2 @@
+---
+has_server_conf: '{{ app.app_dir }}/conf/has_server.conf'

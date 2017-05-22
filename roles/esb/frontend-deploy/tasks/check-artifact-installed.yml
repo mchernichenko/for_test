@@ -1,0 +1,23 @@
+---
+- debug:
+    var: artifact_content
+    verbosity: 1
+
+- name: Wait until all features are installed
+  include: wait-feature.yml
+  with_items: "{{ artifact_content.features }}"
+  when: artifact_content.features|length > 0
+  loop_control:
+    loop_var: feature_to_wait
+
+- name: Wait until all neccessary bundles are installed
+  include: wait-bundles.yml
+  vars:
+    bundles_to_wait: "{{ artifact_content.bundles }}"
+  when: artifact_content.bundles|length > 0
+
+- name: Wait until all services started
+  include: wait-services.yml
+  vars:
+    bundles_to_wait: "{{ artifact_content.bundles }}"
+  when: artifact_content.bundles|length > 0

@@ -1,0 +1,30 @@
+---
+- debug:
+    var: artifacts_pattern
+    verbosity: 1
+
+- name: Select artifacts to deploy
+  find:
+    paths: "{{ app.temp_dir }}"
+    patterns: "{{ artifacts_pattern }}"
+    use_regex: true
+  register: artifacts_pattern_found
+
+- debug:
+    var: artifacts_pattern_found
+    verbosity: 1
+
+- set_fact:
+    artifacts_to_deploy: "{{ artifacts_pattern_found.files | map( attribute='path' ) | list }}"
+
+- debug: var=artifacts_to_deploy
+
+- name: Deploy artifact
+  include: deploy-artifact.yml
+  static: false
+  with_items: "{{ artifacts_to_deploy | default([]) }}"
+  loop_control:
+    loop_var: artifact_path
+
+#- pause: prompt="Wait for {{ artifacts_to_deploy }}" seconds=20
+#  when: artifacts_to_deploy|length > 0

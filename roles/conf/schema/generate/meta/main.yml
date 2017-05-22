@@ -1,0 +1,8 @@
+galaxy_info:
+  author: Konstantin Shuleshov
+  description: Role for generate the configuration schema
+  company: Peter-Service
+
+  min_ansible_version: 2.2
+
+dependencies: []

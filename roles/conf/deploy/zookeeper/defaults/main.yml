@@ -1,0 +1,5 @@
+---
+classifier: "it"
+template: true
+zapp_name: "{{ app_name }}"
+znode_path: /ps/config/apps/{{ zapp_name }}

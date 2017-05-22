@@ -1,0 +1,110 @@
+---
+- name: Search artifact
+  artifactory:
+    path: "{{ artifactory.path }}*app"
+  register: search
+
+- debug:
+    var: search
+    verbosity: 1
+
+- block:
+  # Запуск команд на целевой машине перед установкой.
+  # Чаще всего используется для "костылей" и лучше решать проблемы другим методом.
+  - name: Run pre-deploy scripts
+    shell: "{{ item }}"
+    with_items: "{{ pre_deploy_scripts|default([]) }}"
+
+  - name: Find war file
+    find:
+      paths: "{{ app.deploy_dir }}"
+      patterns: "{{ war_name }}*.war"
+    register: current_war
+    ignore_errors: yes
+
+  - debug:
+      var: current_war
+      verbosity: 1
+
+  - name: Find war version
+    set_fact:
+      version: "{{ current_war.files[0].path | regex_search('\\d+\\.\\d+(\\.?\\d+){0,}') }}"
+    when: current_war.matched > 0
+
+  - debug:
+      var: version
+      verbosity: 1
+
+  - name: Check that tomcat is working
+    wait_for:
+      host: localhost
+      port: "{{ tomcat_port }}"
+      state: started
+      timeout: 5
+      delay: 1
+    register: port
+    ignore_errors: yes
+
+  - debug:
+      var: port
+      verbosity: 1
+
+  - name: Undeploy war
+    uri:
+      url: "http://localhost:{{ tomcat_port }}/manager/text/undeploy?path=/{{ war_name }}-{{ version }}"
+      method: GET
+      return_content: yes
+      user: "{{ tomcat_user }}"
+      password: "{{ tomcat_password }}"
+      force_basic_auth: yes
+      timeout: 1200
+    register: deploy_result
+    when: current_war.matched > 0 and 'state' in port and port.state == 'started'
+
+  - name: Debug undeploy
+    debug:
+      var: deploy_result
+      verbosity: 1
+    when: current_war.matched > 0 and 'state' in port and port.state == 'started'
+    
+  - name: Find unzipped war path
+    find:
+      paths: "{{ app.deploy_dir }}"
+      patterns: "{{ war_name }}*"
+      file_type: directory
+    register: unzipped_war
+    when: current_war.matched > 0 and 'failed' in port and port.failed == true
+    
+  - debug:
+      var: unzipped_war
+      verbosity: 1
+      
+  - name: Remove war if tomcat is not working
+    file:
+      path: "{{ item.path }}"
+      state: absent
+    with_items: "{{ current_war.files }}"
+    when: current_war.matched > 0 and 'failed' in port and port.failed == true
+    
+  - name: Remove unzipped war if tomcat is not working
+    file:
+      path: "{{ item.path }}"
+      state: absent
+    with_items: "{{ unzipped_war.files }}"
+    when: current_war.matched > 0 and 'failed' in port and port.failed == true
+
+  - name: Download and unarchive
+    unarchive:
+      src: "{{ artifactory.url }}/{{ search.artifact.full_path }}"
+      dest: "{{ app.deploy_dir }}"
+      remote_src: yes
+
+  # Запуск команд на целевой машине после установки.
+  # Чаще всего используется для "костылей" и лучше решать проблемы другим методом.
+  - name: Run post-deploy scripts
+    shell: "{{ item }}"
+    with_items: "{{ post_deploy_scripts|default([]) }}"
+
+  when: search.artifact.found
+  rescue:
+    - debug: msg='WAR deploy for artifact with path "{{ artifactory.path }}" failed'

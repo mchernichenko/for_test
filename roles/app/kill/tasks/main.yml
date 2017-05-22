@@ -1,0 +1,30 @@
+---
+- name: Try to kill
+  shell: >
+      {{ item }}
+  register: s
+  with_items: "{{ kill_command }}"
+  ignore_errors: True
+  no_log: true
+
+- name: Prepare logs for output
+  set_fact:
+     stdmod: "{% if s.results[0].module_stdout is defined %}{{ s.results | selectattr('module_stdout') | join('\n', attribute='module_stdout') }}{% endif %}"
+     stdout: "{% if s.results[0].stdout is defined %}{{ s.results | selectattr('stdout') | join('\n', attribute='stdout') }}{% endif %}"
+     stderr: "{% if s.results[0].stderr is defined %}{{ s.results | selectattr('stderr') | join('\n', attribute='stderr') }}{% endif %}"
+  when: s.results is defined
+
+- name: Output stdmod
+  debug:
+     msg: "{{ stdmod.splitlines() }}"
+  when: stdmod != ""
+
+- name: Output stdout
+  debug:
+     msg: "{{ stdout.splitlines() }}"
+  when: stdout != ""
+
+- name: Output stderr
+  debug: 
+     msg: "{{ stderr.splitlines() }}"
+  when: stderr != ""

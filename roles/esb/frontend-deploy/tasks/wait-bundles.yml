@@ -1,0 +1,44 @@
+---
+- debug:
+    var: bundles_to_wait
+    verbosity: 1
+
+- name: Make command to query statuses of bundles
+  template:
+    src: status-of-bundles.cmd.j2
+    dest: "{{ app.temp_dir }}/status-of-bundles.cmd"
+
+- name: Echo status-of-bundles.cmd
+  command: cat {{ app.temp_dir }}/status-of-bundles.cmd
+
+- name: Wait until all bundles appears
+  shell: '{{ app.app_dir }}/container/bin/client -f {{ app.temp_dir }}/status-of-bundles.cmd 2>/dev/null | grep -vF "Logging in as karaf"'
+  register: appear_result
+  until: (appear_result.stdout_lines | length) > 0
+          and (appear_result.stdout_lines | select('search', 'does not match any bundle') | list | length) == 0
+  retries: "{{ bundle_start_timeout // 1 }}"
+  failed_when: false
+  delay: 1
+
+- name: Wait until all bundles become active
+  shell: '{{ app.app_dir }}/container/bin/client -f {{ app.temp_dir }}/status-of-bundles.cmd 2>/dev/null | grep -vF "Logging in as karaf"'
+  register: status_result
+  until: (status_result.stdout_lines | select('search', '\\| Active') | list | length) == (bundles_to_wait|length)
+          or (status_result.stdout_lines | select('search', '(Error|\\| Fail)') | list | length) > 0
+  retries: "{{ bundle_start_timeout // 1 }}"
+  failed_when: status_result.stdout_lines | select('search', '(Error|\\| Fail)') | list | length > 0
+  delay: 1
+
+- debug:
+    var: status_result
+    verbosity: 1
+
+- name: Check if all bundles've became Active
+  fail:
+    msg: Bundles've not activated in {{ bundle_start_timeout }} sec period
+  when: status_result | failed
+
+- name: Drop status-of-bundles.cmd
+  file: 
+    path: "{{ app.temp_dir }}/status-of-bundles.cmd"
+    state: absent

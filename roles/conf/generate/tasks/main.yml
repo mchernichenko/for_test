@@ -1,0 +1,13 @@
+---
+- name: Check properties
+  assert:
+    that:
+      - product_name is defined
+
+- name: Generate product config
+  become: no
+  delegate_to: localhost
+  #debug: msg="{{ ps|json_query('{'~product_name~':'~product_name~'}')|to_nice_json(indent=2) }}"
+  copy:
+    content: "{{ ps|json_query('{'~product_name~':'~product_name~'}')|to_nice_json(indent=2) }}"
+    dest: "{{ playbook_dir }}/schemas/{{ product_name }}.json.generated"

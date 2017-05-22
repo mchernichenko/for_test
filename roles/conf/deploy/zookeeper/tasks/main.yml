@@ -1,0 +1,68 @@
+---
+- name: Search artifact
+  artifactory:
+    path: "{{ artifactory.path }}*conf/{{ classifier }}/zk*"
+  register: search
+
+- debug:
+    var: search
+    verbosity: 1
+
+- block:
+  - name: Generate temp directory name
+    set_fact:
+      tmp_path: "{{ ansible_temp_dir | default('/tmp') }}/ansible-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}_{{ 999999|random }}"
+
+  - name: Create temp directories
+    file:
+      path: "{{ tmp_path }}/{{ item }}"
+      state: directory
+    with_items:
+      - src
+      - target
+
+  - name: Download configs to local
+    unarchive:
+      src: "{{ artifactory.url }}/{{ search.artifact.full_path }}"
+      dest: "{{ tmp_path }}/src"
+      #remote_src: yes
+      copy: no
+    when: search.artifact.found
+
+  - name: Create folders for configs
+    file:
+      dest: "{{ tmp_path }}/target/{{ item|replace(tmp_path~'/src', '') }}"
+      state: directory
+    with_items: "{{ lookup('pipe', 'find ' + tmp_path + '/src/ -mindepth 1 -type d').split('\n') }}"
+    when: search.artifact.found
+
+  - name: Copy all files recursively
+    copy:
+      src: "{{ item }}"
+      dest: "{{ tmp_path }}/target/{{ item|replace(tmp_path~'/src', '') }}"
+    with_items: "{{ lookup('pipe', 'find ' + tmp_path + '/src/ -type f').split('\n') }}"
+    when: search.artifact.found and not template
+
+  - name: Copy all templates recursively
+    template:
+      src: "{{ item }}"
+      dest: "{{ tmp_path }}/target/{{ item|replace(tmp_path~'/src', '') }}"
+    with_items: "{{ lookup('pipe', 'find ' + tmp_path + '/src/ -type f').split('\n') }}"
+    when: search.artifact.found and template
+
+  - name: Load configs to zookeeper
+    local_action: >
+      command java -jar {{ role_path }}/files/zloader-2.1.0-exec.jar
+      --node={{ znode_path }}
+      --yaml={{ item }}
+      --zk={{ zoo_host }}
+    with_items: "{{ lookup('pipe', 'find ' + tmp_path + '/target/ -type f').split('\n') }}"
+    when: search.artifact.found
+
+  - name: Remove temp directory
+    file:
+      path: "{{ tmp_path }}"
+      state: absent
+
+  delegate_to: localhost
+  become: no

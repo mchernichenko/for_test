@@ -1,0 +1,67 @@
+---
+- name: Search artifact
+  artifactory:
+    path: "{{ artifactory.path }}*app"
+  register: search
+
+- debug:
+    var: search
+    verbosity: 1
+
+- block:
+  # Запуск команд на целевой машине перед установкой.
+  # Чаще всего используется для "костылей" и лучше решать проблемы другим методом.
+  - name: Run pre-deploy scripts
+    shell: "{{ item }}"
+    with_items: "{{ pre_deploy_scripts|default([]) }}"
+
+  - name: Download and unarchive
+    unarchive:
+      src: "{{ artifactory.url }}/{{ search.artifact.full_path }}"
+      dest: "{{ app.app_dir }}"
+      remote_src: yes
+    when: "{{ not store_on_host|default(false) }}"
+
+  - name: Download archive to server
+    get_url:
+      url: "{{ artifactory.url }}/{{ search.artifact.full_path }}"
+      dest: "{{ base_dir }}/{{ search.artifact.name }}"
+      checksum: md5:{{ search.artifact.actual_md5 }}
+    when: "{{ store_on_host|default(false) }}"
+
+  - name: Unarchive
+    unarchive:
+      src: "{{ base_dir }}/{{ search.artifact.name }}"
+      dest: "{{ app.app_dir }}"
+      remote_src: yes
+    when: "{{ store_on_host|default(false) }}"
+
+  # Запуск команд на целевой машине после установки.
+  # Чаще всего используется для "костылей" и лучше решать проблемы другим методом.
+  - name: Run post-deploy scripts
+    shell: "{{ item }}"
+    with_items: "{{ post_deploy_scripts|default([]) }}"
+
+  # Перемещение
+  - name: Move files and directories if needed
+    shell: mv {{ item.src }} {{ item.dest }}
+    with_items: "{{ move_files|default([]) }}"
+
+  # Создаем симлинки
+  - name: Remove directories
+    file:
+      path: "{{ item.dest }}"
+      state: absent
+      force: yes
+    with_items: "{{ symlinks|default([]) }}"
+
+  - name: Create symlinks
+    file:
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
+      state: "link"
+    with_items: "{{ symlinks|default([]) }}"
+
+  when: search.artifact.found
+  rescue:
+    - debug: msg='Deploy artifact with path "{{ artifactory.path }} failed"'

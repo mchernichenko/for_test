@@ -1,0 +1,6 @@
+galaxy_info:
+  author: Konstantin Samoylov
+  description: Role for configure HAS Server without templates
+  company: Peter-Service
+
+  min_ansible_version: 2.2

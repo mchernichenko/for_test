@@ -1,0 +1,4 @@
+---
+feature_start_timeout: 60
+bundle_start_timeout: 180
+service_up_timeout: 180

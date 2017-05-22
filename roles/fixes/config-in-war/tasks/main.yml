@@ -1,0 +1,32 @@
+---
+- block:
+  - name: Find app directories
+    shell: ls *war | sed -r 's/\.war//g'
+    args:
+      chdir: "{{ app.deploy_dir }}"
+    register: webapps
+
+  - name: Wait unpack war files
+    wait_for:
+      path: "{{ app.deploy_dir }}/{{ item }}/"
+      state: "present"
+      timeout: "{{ waiting_timeout_for_unpack_war|default(120) }}"
+    with_items: "{{ webapps.stdout_lines|default([]) }}"
+
+  - name: Find zoo connect in files
+    shell: >
+        grep -rIl "localhost:2181" "{{ app.deploy_dir }}/";
+        true
+    register: configs
+
+  - name: Change connect
+    replace:
+      dest: "{{ item }}"
+      regexp: "localhost:2181"
+      replace: "{{ zoo_host }}"
+    with_items:  "{{ configs.stdout_lines|default([]) }}"
+
+  - include: ../../../app/stop/tasks/main.yml
+  - include: ../../../app/start/tasks/main.yml
+
+  when: replace_zoo_in_war|default(false)

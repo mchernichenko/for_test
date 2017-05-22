@@ -1,0 +1,4 @@
+---
+classifier: "it"
+nls_lang: "AMERICAN_CIS.CL8MSWIN1251" # TODO "AMERICAN_AMERICA.AL32UTF8"
+template: true

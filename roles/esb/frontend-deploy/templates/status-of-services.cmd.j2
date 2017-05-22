@@ -1,0 +1,7 @@
+{% for bundle in bundles_to_wait %}
+{% if bundle.services is defined %}
+{% for service in bundle.services %}
+bundleId=(bundle:id {{ bundle.symbolic_name }}); echo {{ bundle.symbolic_name }}[{{ service }}] "|" (service:wait -t {{ service_up_timeout }}000 "&(objectClass={{ service }})(service.bundleid = $bundleId)")
+{% endfor %}
+{% endif %}
+{% endfor %}

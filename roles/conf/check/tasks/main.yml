@@ -1,0 +1,39 @@
+---
+- name: Check properties
+  assert:
+    that:
+      - product_name is defined
+
+- block:
+
+  - name: Generate temp directory name
+    set_fact:
+      tmp_path: "{{ ansible_temp_dir | default('/tmp') }}/ansible-{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}_{{ 999999|random }}"
+
+  - name: Create temp directory
+    file:
+      path: "{{ tmp_path }}"
+      state: directory
+
+  - debug:
+      msg: "{{ ps|json_query('{'~product_name~':'~product_name~'}')|to_nice_json(indent=2) }}"
+      verbosity: 1
+
+  - name: Generate product config
+    copy:
+      content: "{{ ps|json_query('{'~product_name~':'~product_name~'}')|to_nice_json(indent=2) }}"
+      dest: "{{ tmp_path }}/{{ product_name }}.json"
+
+  - name: Check product config
+    local_action: >
+      command java -jar {{ role_path }}/../schema/check/files/json-schema-validator-2.2.6-lib.jar
+      {{ playbook_dir }}/schemas/{{ product_name }}-schema.json
+      {{ tmp_path }}/{{ product_name }}.json
+
+  - name: Remove temp directory
+    file:
+      path: "{{ tmp_path }}"
+      state: absent
+
+  become: no
+  delegate_to: localhost
